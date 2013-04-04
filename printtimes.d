@@ -19,4 +19,9 @@ void main(string[] args)
 	modules.sort!`a.name < b.name`();
 	foreach (m; modules)
 		writefln("%(%5.3f\t%)\t%s", m.bestTime[].map!(a => cast(double)a / TICKS_PER_SECOND)().array(), m.name);
+	ulong[Metric.max] total;
+	foreach (m; modules)
+		foreach (metric, time; m.bestTime)
+			total[metric] += time;
+	writefln("%(%5.3f\t%)\t%s", total[].map!(a => cast(double)a / TICKS_PER_SECOND)().array(), "Total");
 }
