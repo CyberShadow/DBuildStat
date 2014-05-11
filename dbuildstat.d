@@ -16,6 +16,7 @@ import std.string;
 
 import ae.sys.cmd;
 import ae.utils.json;
+import ae.utils.regex;
 
 import common;
 
@@ -24,12 +25,14 @@ alias std.string.join join; // Issue 314
 void main(string[] args)
 {
 	int iterations = int.max;
+	bool useVerboseOutput;
 	getopt(args,
 		config.passThrough,
 		"iterations", &iterations,
+		"use-verbose-output", &useVerboseOutput,
 	);
 
-	enforce(args.length > 1, "Usage: " ~ args[0] ~ " [--iterations=ITERATIONS] [COMPILER_OPTS...] PROGRAM.d");
+	enforce(args.length > 1, "Usage: " ~ args[0] ~ " [--iterations=ITERATIONS] [--use-verbose-output] [COMPILER-OPTS...] PROGRAM.d");
 	auto program = args[$-1];
 	auto options = args[1..$-1];
 
@@ -37,32 +40,59 @@ void main(string[] args)
 
 	stderr.writeln("Getting file list...");
 
-	string[string] getDeps(string target)
+	if (useVerboseOutput)
 	{
-		string[string] result;
-		auto lines = query(["dmd", "-v", "-o-"] ~ options ~ [target]).splitLines();
-		foreach (line; lines)
-			if (line.startsWith("import    "))
-				result[line.split("\t")[0][10..$]] = line.split("\t")[1][1..$-1].buildNormalizedPath();
-		return result;
+		string[string] getDeps(string target)
+		{
+			string[string] result;
+			auto lines = query(["dmd", "-v", "-o-"] ~ options ~ [target]).splitLines();
+			foreach (line; lines)
+				if (line.startsWith("import    "))
+					result[line.split("\t")[0][10..$]] = line.split("\t")[1][1..$-1].buildNormalizedPath();
+			return result;
+		}
+
+		auto rootDeps = getDeps(program);
+		modules ~= Module(program.stripExtension(), absolutePath(program), rootDeps);
+		foreach (name; rootDeps.keys.sort)
+			modules ~= Module(name, rootDeps[name]);
+
+		stderr.writeln("Getting module dependencies...");
+		foreach (ref m; modules)
+		{
+			stderr.writeln(m.name);
+			m.deps = getDeps(m.path);
+		}
 	}
-
-	auto rootDeps = getDeps(program);
-	modules ~= Module(program.stripExtension(), absolutePath(program), rootDeps);
-	foreach (name; rootDeps.keys.sort)
-		modules ~= Module(name, rootDeps[name]);
-
-	stderr.writeln("Getting module dependencies...");
-	foreach (ref m; modules)
+	else
 	{
-		stderr.writeln(m.name);
-		m.deps = getDeps(m.path);
+		Module* getModule(string name, string path)
+		{
+			foreach (ref m; modules)
+				if (m.name == name)
+					return &m;
+			modules ~= Module(name, path);
+			return &modules[$-1];
+		}
+
+		auto depsFile = program.setExtension(".deps");
+		run(["dmd", "-deps=" ~ depsFile, "-o-"] ~ options ~ [program]);
+		foreach (line; depsFile.readText().splitLines())
+			// awesome (awesome.d) : private : object (C:\\Soft\\dmd2d\\windows\\bin\\..\\..\\import\\druntime\\object.di)
+			line.matchCaptures(`^(.*) \((.*)\) : \w+ : (.*) \((.*)\)$`,
+				(string srcName, string srcPath, string dstName, string dstPath)
+				{
+					getModule(srcName, srcPath).deps[dstName] = dstPath;
+					getModule(dstName, dstPath); // make sure it's added
+				});
 	}
 
 	auto workDir = buildPath(tempDir(), "dbuildstat");
 
 	foreach (iteration; 0..iterations)
 	{
+		program.setExtension("dbuildstat").write(modules.toJson());
+
 		stderr.writefln("=== Iteration %d ===", iteration);
 
 		foreach (ref m; modules)
@@ -104,7 +134,5 @@ void main(string[] args)
 				m.bestTime[metric] = min(m.bestTime[metric], result);
 			}
 		}
-
-		program.setExtension("dbuildstat").write(modules.toJson());
 	}
 }
