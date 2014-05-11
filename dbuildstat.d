@@ -14,6 +14,7 @@ import std.process;
 import std.stdio : stderr;
 import std.string;
 
+import ae.sys.cmd;
 import ae.utils.json;
 
 import common;
@@ -39,7 +40,7 @@ void main(string[] args)
 	string[string] getDeps(string target)
 	{
 		string[string] result;
-		auto lines = shell(escapeShellCommand(["dmd", "-v", "-o-"] ~ options ~ [target])).splitLines();
+		auto lines = query(["dmd", "-v", "-o-"] ~ options ~ [target]).splitLines();
 		foreach (line; lines)
 			if (line.startsWith("import    "))
 				result[line.split("\t")[0][10..$]] = line.split("\t")[1][1..$-1].buildNormalizedPath();
@@ -97,7 +98,7 @@ void main(string[] args)
 
 				StopWatch sw;
 				sw.start();
-				shell(escapeShellCommand(["dmd", "-od" ~ workDir] ~ metricOptions ~ options ~ [target]));
+				run(["dmd", "-od" ~ workDir] ~ metricOptions ~ options ~ [target]);
 				sw.stop();
 				auto result = sw.peek().to!("hnsecs", ulong)();
 				m.bestTime[metric] = min(m.bestTime[metric], result);
