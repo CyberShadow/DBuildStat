@@ -54,7 +54,7 @@ void main(string[] args)
 
 		auto rootDeps = getDeps(program);
 		modules ~= Module(program.stripExtension(), absolutePath(program), rootDeps);
-		foreach (name; rootDeps.keys.sort)
+		foreach (name; rootDeps.keys.sort())
 			modules ~= Module(name, rootDeps[name]);
 
 		stderr.writeln("Getting module dependencies...");
