@@ -1,0 +1,18 @@
+# Windows
+
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.suo
+*.obj
+
+# POSIX
+
+*.o
+
+/dbuildstat
+/makedot
+/makesvg
+/printtimes
