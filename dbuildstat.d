@@ -9,6 +9,7 @@ import std.datetime;
 import std.exception;
 import std.getopt;
 import std.file;
+import std.json;
 import std.path;
 import std.process;
 import std.stdio : stderr;
@@ -42,6 +43,14 @@ void main(string[] args)
 
 	if (useVerboseOutput)
 	{
+		string getModuleName(string fn)
+		{
+			enum jsonFileName = "dbuildstat.json";
+			run(["dmd", "-o-", "-Xf" ~ jsonFileName] ~ options ~ [fn]);
+			scope(exit) remove(jsonFileName);
+			return jsonFileName.readText.parseJSON()[0]["name"].str;
+		}
+
 		string[string] getDeps(string target)
 		{
 			string[string] result;
@@ -53,7 +62,7 @@ void main(string[] args)
 		}
 
 		auto rootDeps = getDeps(program);
-		modules ~= Module(program.stripExtension(), absolutePath(program), rootDeps);
+		modules ~= Module(getModuleName(program), absolutePath(program), rootDeps);
 		foreach (name; rootDeps.keys.sort())
 			modules ~= Module(name, rootDeps[name]);
 
@@ -108,12 +117,17 @@ void main(string[] args)
 
 				string[] metricOptions;
 				string target = m.path;
-				switch (metric)
+				final switch (metric)
 				{
 					case Metric.parseImports:
 						target = buildPath(workDir, "justimports.d");
 						auto imports = m.deps.keys.filter!(s => s != "object")().array();
 						target.write(imports.length ? "import " ~ imports.join(",") ~ ";" : "");
+						metricOptions = ["-o-"];
+						break;
+					case Metric.import_:
+						target = buildPath(workDir, "justimport.d");
+						target.write("import " ~ m.name ~ ";");
 						metricOptions = ["-o-"];
 						break;
 					case Metric.parse:
@@ -122,8 +136,8 @@ void main(string[] args)
 					case Metric.compile:
 						metricOptions = ["-c"];
 						break;
-					default:
-						assert(0);
+					case Metric.max:
+						assert(false);
 				}
 
 				StopWatch sw;

@@ -62,8 +62,8 @@ void main(string[] args)
 	foreach (x; 0..seconds+1)
 		label(timeLabels, CENTER - x*PIXELS_PER_SECOND, 0, text(x));
 
-	enum string[Metric.max] METRIC_NAMES  = ["Parse imports", "Parse", "Compile"];
-	enum string[Metric.max] METRIC_COLORS = ["#2222FF", "#00CC00", "#FF0000"];
+	enum string[Metric.max] METRIC_NAMES  = ["Parse imports", "Import", "Parse", "Compile"];
+	enum string[Metric.max] METRIC_COLORS = ["#2222FF", "#00AAAA", "#00CC00", "#FF0000"];
 
 	auto boxes = svg.g();
 	auto labels = svg.g();

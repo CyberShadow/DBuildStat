@@ -1,6 +1,7 @@
 enum Metric
 {
 	parseImports,
+	import_,
 	parse,
 	compile,
 	max
